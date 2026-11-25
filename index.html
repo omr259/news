@@ -56,6 +56,26 @@ header{position:sticky;top:0;z-index:6;background:rgba(8,13,24,.96);padding:6px 
 .btn.alt{background:var(--p2);color:var(--tx);border:1px solid var(--ln)}
 .fv{font-size:18px}
 @media (prefers-reduced-motion:reduce){.card,.line,.sk{animation:none}}
+.cs{width:100%;background:var(--p);color:var(--tx);border:1px solid var(--ln);border-radius:12px;padding:10px 12px;font:inherit;font-weight:700;font-size:15px;margin:10px 0 0}
+.cs:focus{outline:2px solid var(--b)}
+.card.ni .bd{padding:14px}
+.card.ni{border-inline-start:4px solid var(--c)}
+@media (min-width:800px){
+.wrap{max-width:1240px;padding:0 24px 34px}
+#main{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;align-items:stretch}
+#main .msg,#main .more{grid-column:1/-1}
+.card{display:flex;flex-direction:row-reverse;margin:0;min-height:210px}
+html[dir=ltr] .card{flex-direction:row}
+.card.ni{min-height:0}
+.card .im{flex:0 0 42%;aspect-ratio:auto;min-height:100%}
+.card .bd{flex:1;min-width:0;display:flex;flex-direction:column}
+.card .bd .row{margin-top:auto;padding-top:8px}
+.card h3{font-size:19px}
+.card p{font-size:15px}
+.srch{max-width:640px}
+.sk{grid-column:auto;height:200px}
+}
+@media (min-width:1500px){#main{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -69,6 +89,7 @@ header{position:sticky;top:0;z-index:6;background:rgba(8,13,24,.96);padding:6px 
 <a class="ib" href="https://omr259.github.io" aria-label="home">⌂</a>
 </header>
 <div class="line"></div>
+<select class="cs" id="cs" aria-label="country"></select>
 <div class="srch"><input id="q" type="search" autocomplete="off"></div>
 <div class="upd" id="upd"></div>
 <div class="chips" id="chips"></div>
@@ -79,7 +100,10 @@ header{position:sticky;top:0;z-index:6;background:rgba(8,13,24,.96);padding:6px 
 var CATS=["all","egypt","world","business","tech","sport","culture"];
 var TX={ar:{all:"الكل",egypt:"مصر",world:"العالم",business:"اقتصاد",tech:"تكنولوجيا",sport:"رياضة",culture:"ثقافة",ph:"ابحث في الأخبار...",upd:"آخر تحديث",every:"بيتحدث تلقائيًا كل 6 ساعات",none:"مفيش أخبار هنا دلوقتي",err:"الأخبار لسه متجهزتش. استنى دقيقتين وحدّث الصفحة.",more:"عرض المزيد",open:"افتح الخبر",save:"حفظ",saved:"محفوظ",close:"إغلاق",fav:"المحفوظات",favnone:"مفيش أخبار محفوظة",top:"أهم خبر",share:"مشاركة",by:"المصدر"},
 en:{all:"All",egypt:"Egypt",world:"World",business:"Business",tech:"Tech",sport:"Sports",culture:"Culture",ph:"Search news...",upd:"Last update",every:"auto-updates every 6 hours",none:"No stories here right now",err:"News is not ready yet. Wait two minutes and refresh.",more:"Show more",open:"Open story",save:"Save",saved:"Saved",close:"Close",fav:"Saved",favnone:"No saved stories",top:"Top story",share:"Share",by:"Source"}};
-var L=localStorage.getItem("nl")||"ar",muted=localStorage.getItem("nm")=="1",cat="all",favOnly=false,term="",shown=24,DATA=null;
+var L=localStorage.getItem("nl")||"ar",muted=localStorage.getItem("nm")=="1",cat="all",CC=localStorage.getItem("nc")||"world",favOnly=false,term="",shown=24,DATA=null;
+var CO=[["world","🌍","عالمي","World"],["EG","🇪🇬","مصر","Egypt"],["SA","🇸🇦","السعودية","Saudi Arabia"],["AE","🇦🇪","الإمارات","UAE"],["KW","🇰🇼","الكويت","Kuwait"],["QA","🇶🇦","قطر","Qatar"],["BH","🇧🇭","البحرين","Bahrain"],["OM","🇴🇲","عمان","Oman"],["IQ","🇮🇶","العراق","Iraq"],["JO","🇯🇴","الأردن","Jordan"],["LB","🇱🇧","لبنان","Lebanon"],["SY","🇸🇾","سوريا","Syria"],["PS","🇵🇸","فلسطين","Palestine"],["YE","🇾🇪","اليمن","Yemen"],["SD","🇸🇩","السودان","Sudan"],["LY","🇱🇾","ليبيا","Libya"],["TN","🇹🇳","تونس","Tunisia"],["DZ","🇩🇿","الجزائر","Algeria"],["MA","🇲🇦","المغرب","Morocco"],["US","🇺🇸","أمريكا","USA"],["GB","🇬🇧","بريطانيا","UK"],["FR","🇫🇷","فرنسا","France"],["DE","🇩🇪","ألمانيا","Germany"],["TR","🇹🇷","تركيا","Turkey"],["ES","🇪🇸","إسبانيا","Spain"],["IT","🇮🇹","إيطاليا","Italy"],["RU","🇷🇺","روسيا","Russia"],["IN","🇮🇳","الهند","India"],["CN","🇨🇳","الصين","China"],["JP","🇯🇵","اليابان","Japan"],["BR","🇧🇷","البرازيل","Brazil"],["CA","🇨🇦","كندا","Canada"],["AU","🇦🇺","أستراليا","Australia"],["NG","🇳🇬","نيجيريا","Nigeria"],["ZA","🇿🇦","جنوب أفريقيا","South Africa"]];
+if(!CO.some(function(c){return c[0]==CC}))CC="world";
+function flag(){for(var i=0;i<CO.length;i++)if(CO[i][0]==CC)return CO[i][1];return""}
 var FAV=[];try{FAV=JSON.parse(localStorage.getItem("nf")||"[]")}catch(e){}
 function $(i){return document.getElementById(i)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
@@ -100,7 +124,7 @@ function thumb(x){return x.i?'<img loading="lazy" decoding="async" referrerpolic
 var cur=[];
 function render(){
  var t=TX[L];document.documentElement.lang=L;document.documentElement.dir=L=="ar"?"rtl":"ltr";
- $("lg").textContent=L=="ar"?"EN":"ع";$("snd").textContent=muted?"🔇":"🔊";$("fvb").textContent=favOnly?"★":"☆";$("q").placeholder=t.ph;
+ $("lg").textContent=L=="ar"?"EN":"ع";$("snd").textContent=muted?"🔇":"🔊";$("fvb").textContent=favOnly?"★":"☆";$("q").placeholder=t.ph;$("cs").innerHTML=CO.map(function(c){return"<option value=\""+c[0]+"\""+(c[0]==CC?" selected":"")+">"+c[1]+" "+(L=="ar"?c[2]:c[3])+"</option>"}).join("");
  $("chips").innerHTML=CATS.map(function(c){return'<button class="chip'+(!favOnly&&cat==c?" on":"")+'" data-c="'+c+'">'+t[c]+"</button>"}).join("");
  if(DATA&&DATA.updated){var d=new Date(DATA.updated);var s=new Intl.DateTimeFormat(L=="ar"?"ar-EG":"en-GB",{timeZone:"Africa/Cairo",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(d);$("upd").innerHTML="<i></i>"+t.upd+": "+s+" · "+t.every}else $("upd").textContent="";
  var m=$("main");
@@ -110,8 +134,8 @@ function render(){
  if(!cur.length){m.innerHTML='<div class="msg">'+(favOnly?t.favnone:t.none)+"</div>";return}
  var h="";
  for(var k=0;k<Math.min(cur.length,shown);k++){var y=cur[k],on=FAV.indexOf(y.l)>=0;
-  h+='<article class="card" style="--i:'+Math.min(k,8)+'"><span class="im">'+(y.i?'<img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" src="'+esc(y.i)+'" onerror="this.remove()">':'<span class="ph">'+esc((y.s||"N").charAt(0))+"</span>")+'<span class="sh"></span></span><span class="bd">'+
-  '<span>'+(k==0&&!favOnly&&!term&&cat=="all"?'<span class="tag">'+t.top+"</span>":"")+'<span class="tag c">'+t[y.c]+'</span></span><h3>'+esc(y.t)+"</h3>"+(y.d?"<p>"+esc(y.d)+"</p>":"")+
+  h+='<article class="card'+(y.i?"":" ni")+'" style="--i:'+Math.min(k,8)+'">'+(y.i?'<span class="im"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" src="'+esc(y.i)+'" onerror="this.parentNode.style.display=\'none\'"><span class="sh"></span></span>':"")+'<span class="bd">'+
+  '<span>'+(k==0&&!favOnly&&!term&&cat=="all"?'<span class="tag">'+t.top+"</span>":"")+'<span class="tag c">'+(CC!="world"?flag()+" ":"")+t[y.c]+'</span></span><h3>'+esc(y.t)+"</h3>"+(y.d?"<p>"+esc(y.d)+"</p>":"")+
   '<span class="src">'+esc(y.s)+" · "+ago(y.p)+'</span><span class="row"><a class="btn go" target="_blank" rel="noopener noreferrer" href="'+esc(safeUrl(y.l))+'">'+t.open+'</a><button class="btn alt sv" data-l="'+esc(y.l)+'" aria-label="save">'+(on?"★":"☆")+"</button></span></span></article>"}
  if(cur.length>shown)h+='<button class="btn alt more" id="more">'+t.more+"</button>";
  m.innerHTML=h;
@@ -127,8 +151,9 @@ $("fvb").onclick=function(){sTap();favOnly=!favOnly;shown=24;render()};
 $("lg").onclick=function(){L=L=="ar"?"en":"ar";localStorage.setItem("nl",L);shown=24;sTap();render()};
 $("snd").onclick=function(){muted=!muted;localStorage.setItem("nm",muted?"1":"0");sTap();render()};
 $("q").addEventListener("input",function(){term=this.value.trim();shown=24;render()});
-fetch("news.json?t="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){DATA=d;render()}).catch(function(){DATA="err";render()});
-render();
+function load(){DATA=null;render();fetch((CC=="world"?"news.json":"c/"+CC+".json")+"?t="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){DATA=d;render()}).catch(function(){DATA="err";render()})}
+$("cs").onchange=function(){CC=this.value;localStorage.setItem("nc",CC);shown=24;sIn();load()};
+load();
 </script>
 </body>
 </html>
