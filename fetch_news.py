@@ -1,5 +1,5 @@
 # يجيب الأخبار من مواقع الأخبار (RSS) ويحفظها في news.json
-import json, re, html, time, urllib.request
+import json, re, html, time, os, urllib.request, urllib.parse
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
@@ -97,7 +97,7 @@ def fetch(name, url, forced):
         link = (f.get("link") or "").strip()
         if not title or not link.startswith("http"):
             continue
-        desc = clean(f.get("description") or f.get("encoded"), 230)
+        desc = clean(f.get("description") or f.get("encoded"), 400)
         if desc.startswith(title[:40]):
             desc = ""
         out.append({
@@ -109,6 +109,8 @@ def fetch(name, url, forced):
             break
     return out
 
+if os.environ.get("ONLY") or os.environ.get("ENRICH_ONLY"):
+    FEEDS = {"ar": [], "en": []}
 try:
     old = json.load(open("news.json", encoding="utf-8"))
 except Exception:
@@ -140,5 +142,130 @@ for lang, feeds in FEEDS.items():
     result[lang] = uniq[:MAX_TOTAL]
     print(lang, "مصادر شغالة:", ok, "/", len(feeds), "أخبار:", len(result[lang]))
 
-with open("news.json", "w", encoding="utf-8") as fh:
-    json.dump(result, fh, ensure_ascii=False, separators=(",", ":"))
+if not (os.environ.get("ONLY") or os.environ.get("ENRICH_ONLY")):
+    with open("news.json", "w", encoding="utf-8") as fh:
+        json.dump(result, fh, ensure_ascii=False, separators=(",", ":"))
+
+
+# ---------- أخبار الدول (من Google News RSS) ----------
+COUNTRIES = [
+ ("EG","مصر","Egypt"),("SA","السعودية","Saudi Arabia"),("AE","الإمارات","United Arab Emirates"),
+ ("KW","الكويت","Kuwait"),("QA","قطر","Qatar"),("BH","البحرين","Bahrain"),("OM","عمان","Oman"),
+ ("IQ","العراق","Iraq"),("JO","الأردن","Jordan"),("LB","لبنان","Lebanon"),("SY","سوريا","Syria"),
+ ("PS","فلسطين","Palestine"),("YE","اليمن","Yemen"),("SD","السودان","Sudan"),("LY","ليبيا","Libya"),
+ ("TN","تونس","Tunisia"),("DZ","الجزائر","Algeria"),("MA","المغرب","Morocco"),
+ ("US","أمريكا","United States"),("GB","بريطانيا","United Kingdom"),("FR","فرنسا","France"),
+ ("DE","ألمانيا","Germany"),("TR","تركيا","Turkey"),("ES","إسبانيا","Spain"),("IT","إيطاليا","Italy"),
+ ("RU","روسيا","Russia"),("IN","الهند","India"),("CN","الصين","China"),("JP","اليابان","Japan"),
+ ("BR","البرازيل","Brazil"),("CA","كندا","Canada"),("AU","أستراليا","Australia"),
+ ("NG","نيجيريا","Nigeria"),("ZA","جنوب أفريقيا","South Africa"),
+]
+
+def gn_get(url):
+    for attempt in range(4):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            return urllib.request.urlopen(req, timeout=25).read()
+        except Exception as e:
+            print("   إعادة", e)
+            time.sleep(15 if "429" in str(e) else 4)
+    return None
+
+def gn_items(query, hl, gl):
+    q = urllib.parse.quote(query + " when:2d")
+    url = "https://news.google.com/rss/search?q=%s&hl=%s&gl=%s&ceid=%s:%s" % (q, hl, gl, gl, hl)
+    data = gn_get(url)
+    if not data:
+        return None
+    root = ET.fromstring(data)
+    out = []
+    for item in root.iter("item"):
+        f = {local(c.tag): (c.text or "") for c in item}
+        src = ""
+        for c in item:
+            if local(c.tag) == "source":
+                src = (c.text or "").strip()
+        title = clean(f.get("title"), 300)
+        if src and title.endswith(" - " + src):
+            title = title[: -len(src) - 3].strip()
+        link = (f.get("link") or "").strip()
+        if not title or not link.startswith("http"):
+            continue
+        rel = []
+        for m in re.finditer(r"<li>\s*<a[^>]*>(.*?)</a>", html.unescape(f.get("description", "")), re.S):
+            r = clean(m.group(1), 200)
+            r = re.sub(r"\s-\s[^-]{2,40}$", "", r)
+            if r and r != title and r not in rel:
+                rel.append(r)
+        d = ""
+        for r in rel:
+            if len(d) + len(r) > 400:
+                break
+            d += (" • " if d else "") + r
+        out.append({"t": title, "d": d, "l": link, "s": src or "Google News", "i": "",
+                    "c": classify(title + " " + d, None),
+                    "p": parse_date(f.get("pubDate") or "").isoformat()})
+    return out
+
+def enrich(items):
+    """يضيف تحت كل خبر عناوين أخبار قريبة منه من مصادر تانية (لأن Google News مش بيدي ملخص)"""
+    def words(t):
+        return set(w for w in re.findall(r"\w+", t.lower()) if len(w) > 3)
+    ws = [words(x["t"]) for x in items]
+    for i, x in enumerate(items):
+        if x["d"] or not ws[i]:
+            continue
+        sc = []
+        for j, y in enumerate(items):
+            if i == j or y["s"] == x["s"] or not ws[j]:
+                continue
+            k = len(ws[i] & ws[j]) / float(min(len(ws[i]), len(ws[j])))
+            if k >= 0.4:
+                sc.append((k, y))
+        d = ""
+        for k, y in sorted(sc, key=lambda a: -a[0])[:3]:
+            if len(d) + len(y["t"]) > 400:
+                break
+            d += (" • " if d else "") + y["t"] + " (" + y["s"] + ")"
+        x["d"] = d
+
+os.makedirs("c", exist_ok=True)
+if os.environ.get("ENRICH_ONLY"):
+    import glob
+    for p in glob.glob("c/*.json"):
+        d = json.load(open(p, encoding="utf-8"))
+        for l in ("ar", "en"):
+            enrich(d[l])
+        json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    raise SystemExit
+for cc, ar, en in COUNTRIES:
+    if os.environ.get("ONLY") and cc not in os.environ["ONLY"].split(","):
+        continue
+    path = "c/%s.json" % cc
+    try:
+        oldc = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        oldc = {}
+    res = {"updated": datetime.now(timezone.utc).isoformat()}
+    for lang, q, hl, gl in (("ar", ar, "ar", "EG"), ("en", en, "en", "US")):
+        got = gn_items(q, hl, gl)
+        time.sleep(3)
+        if got:
+            seen, uniq = set(), []
+            for x in sorted(got, key=lambda x: x["p"], reverse=True):
+                if x["t"] in seen:
+                    continue
+                seen.add(x["t"])
+                uniq.append(x)
+            enrich(uniq)
+            res[lang] = uniq[:60]
+        else:
+            res[lang] = oldc.get(lang, [])
+    print(cc, len(res["ar"]), len(res["en"]))
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(res, fh, ensure_ascii=False, separators=(",", ":"))
+
+# يضيف ملفات الدول للحفظ (الـ workflow القديم بيعمل commit للي اتضاف)
+import subprocess
+if not os.environ.get("ONLY") and os.path.isdir(".git"):
+    subprocess.run(["git", "add", "-A", "c"])
