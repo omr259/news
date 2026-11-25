@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080d18">
 <title>أخبار | NEWS</title>
+<link rel="preconnect" href="https://wsrv.nl" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -107,6 +108,8 @@ function flag(){for(var i=0;i<CO.length;i++)if(CO[i][0]==CC)return CO[i][1];retu
 var FAV=[];try{FAV=JSON.parse(localStorage.getItem("nf")||"[]")}catch(e){}
 function $(i){return document.getElementById(i)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function pimg(u){return"https://wsrv.nl/?url="+encodeURIComponent(u)+"&w=640&q=72&output=webp"}
+function imgFail(im){var o=im.getAttribute("data-o");if(o&&!im.getAttribute("data-t")){im.setAttribute("data-t","1");im.src=o}else im.parentNode.style.display="none"}
 function safeUrl(u){return /^https?:\/\//i.test(u)?u:"#"}
 var AC=null;
 function tone(seq,type,vol,gap){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state=="suspended")AC.resume();var t=AC.currentTime;seq.forEach(function(n,i){var o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=n;var s=t+i*(gap||.08);g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(vol,s+.015);g.gain.exponentialRampToValueAtTime(0.0001,s+.15);o.connect(g);g.connect(AC.destination);o.start(s);o.stop(s+.17)})}catch(e){}}
@@ -134,7 +137,7 @@ function render(){
  if(!cur.length){m.innerHTML='<div class="msg">'+(favOnly?t.favnone:t.none)+"</div>";return}
  var h="";
  for(var k=0;k<Math.min(cur.length,shown);k++){var y=cur[k],on=FAV.indexOf(y.l)>=0;
-  h+='<article class="card'+(y.i?"":" ni")+'" style="--i:'+Math.min(k,8)+'">'+(y.i?'<span class="im"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" src="'+esc(y.i)+'" onerror="this.parentNode.style.display=\'none\'"><span class="sh"></span></span>':"")+'<span class="bd">'+
+  h+='<article class="card'+(y.i?"":" ni")+'" style="--i:'+Math.min(k,8)+'">'+(y.i?'<span class="im"><img '+(k<2?'fetchpriority="high"':'loading="lazy"')+' decoding="async" referrerpolicy="no-referrer" alt="" src="'+esc(pimg(y.i))+'" data-o="'+esc(y.i)+'" onerror="imgFail(this)"><span class="sh"></span></span>':"")+'<span class="bd">'+
   '<span>'+(k==0&&!favOnly&&!term&&cat=="all"?'<span class="tag">'+t.top+"</span>":"")+'<span class="tag c">'+(CC!="world"?flag()+" ":"")+t[y.c]+'</span></span><h3>'+esc(y.t)+"</h3>"+(y.d?"<p>"+esc(y.d)+"</p>":"")+
   '<span class="src">'+esc(y.s)+" · "+ago(y.p)+'</span><span class="row"><a class="btn go" target="_blank" rel="noopener noreferrer" href="'+esc(safeUrl(y.l))+'">'+t.open+'</a><button class="btn alt sv" data-l="'+esc(y.l)+'" aria-label="save">'+(on?"★":"☆")+"</button></span></span></article>"}
  if(cur.length>shown)h+='<button class="btn alt more" id="more">'+t.more+"</button>";
